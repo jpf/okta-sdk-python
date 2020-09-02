@@ -65,24 +65,29 @@ You'll also need
 
 Construct a client instance by passing it your Okta domain name and API token:
 
+The recommended approach to instantiating the Okta SDK is by setting the `OKTA_CLIENT_ORG_URL` and `OKTA_CLIENT_TOKEN` environment variables to their respective values, and then instantiating the Okta SDK as follows:
+
+```py
+from okta.client import Client as OktaClient
+okta = OktaClient()
+```
+
+However, if you are in a rush or don't know how to set environment variables. You can pass the configuration data to the Okta SDK as follows:
+
+> *Note!* We strongly urge you not to use this method as it is less secure and might result in you, for example, checking your Okta API token into source control.
+
 ```py
 from okta.client import Client as OktaClient
 # Instantiating with a Python dictionary in the constructor
-config = {
+okta = OktaClient({
     "orgUrl": "https://test.okta.com",
     "token": "YOUR_API_TOKEN"
-}
-my_okta_client = OktaClient(config)
-
-# Instantiating without in-text credentials
-my_okta_client = OktaClient()
+})
 ```
-
-> Using a Python dictionary to hard-code the Okta domain and API token is encouraged for development; In production, you should use a more secure way of storing these values. This library supports a few different configuration sources, covered in the [configuration reference](#configuration-reference) section.
 
 ### OAuth 2.0
 
-Okta allows you to interact with Okta APIs using scoped OAuth 2.0 access tokens. Each access token enables the bearer to perform specific actions on specific Okta endpoints, with that ability controlled by which scopes the access token contains.
+Okta also allows you to interact with Okta APIs using scoped OAuth 2.0 access tokens. Each access token enables the bearer to perform specific actions on specific Okta endpoints, with that ability controlled by which scopes the access token contains.
 
 This SDK supports this feature (OAuth 2.0) only for service-to-service applications. Check out [our guides][oauth-guides] to learn more about how to register a new service application using a private and public key pair.
 
@@ -90,77 +95,46 @@ When using this approach you won't need an API Token because the SDK will reques
 
 ```py
 from okta.client import Client as OktaClient
-config = {
+jwk = {
+    "e": "example",
+    "n": "example",
+    "d": "example"
+}
+okta = OktaClient({
     "orgUrl": "https://test.okta.com",
+    # FIXME: This should be a default:
     "authorizationMode": "PrivateKey",
     "clientId": "YOUR_CLIENT_ID",
     "scopes": ["okta.users.manage"],
-    "privateKey": {'JsonWebKey'}
-}
-client = OktaClient(config)
+    "privateKey": jwk
+})
 ```
 
-> Using a Python dictionary to hard-code the Okta domain and API token is encouraged for development; In production, you should use a more secure way of storing these values. This library supports a few different configuration sources, covered in the [configuration reference](#configuration-reference) section.
-
-### Extending the Client
-
-When creating a new client, we allow for you to pass custom instances of `okta.request_executor`, `okta.http_client` and `okta.cache.cache`.
-
-```py
-from okta.client import Client as OktaClient
-# Assuming implementations are in project.custom
-from project.custom.request_executor_impl import RequestExecImpl
-from project.custom.http_client_impl import HTTPClientImpl
-from project.custom.cache_impl import CacheImpl
-config = {
-    "orgUrl": "https://test.okta.com",
-    "token": "YOUR_API_TOKEN",
-    "requestExecutor": RequestExecImpl,
-    "httpClient": HTTPClientImpl,
-    "cacheManager": CacheImpl
-}
-```
-
-### Extending or Creating New Classes
-
-Example: You can create a custom cache driver by implementing `okta.cache.cache`
-
-```py
-from okta.cache.cache import Cache
-
-class CustomCache(Cache):
-  def __init__(self, params):
-    super().__init__()
-    # Constructor
-
-  # Must implement all methods from the Cache class
-  def get(self, key):
-    # Implementation
-
-  """Rest of methods"""
-  ...
-```
-
-A similar approach can be used to extend `okta.request_executor` and `okta.http_client`.
+> *Note!* We strongly urge you not to use this method to store your private key as it is less secure and might result in you, for example, checking your private key into source control.
 
 ## Usage guide
 
 These examples will help you understand how to use this library.
 
-Once you initialize a `client`, you can call methods to make requests to the Okta API. The client uses **asynchronous** methods to operate. Most methods are grouped by the API endpoint they belong to. For example, methods that call the [Users API][users-api-docs] are organized under [the User resource client (okta.resource_clients.user_client.py)][users-client].
+Once you initialize the `okta` client, you can call methods to make requests to the Okta API. The `okta` client uses **asynchronous** methods to operate. Most methods are grouped by the API endpoint they belong to. For example, methods that call the [Users API][users-api-docs] are organized under [the User resource client (okta.resource_clients.user_client.py)][users-client].
 
+**FIXME: This needs to be cleaned up, it's too vague and must include examples for how to use async calls**
 > Asynchronous I/O is fairly new to Python after making its debut in Python 3.5. It's powered by the `asyncio` library which provides avenues to produce concurrent code. This allows developers to define `async` functions and `await` asynchronous calls within them. For more information, you can check out the Python docs [here][python-docs].
 
 ### Authenticate a User
 
-This library should only be used with the Okta management API. To call the [Authentication API][authn-api], you should construct your own HTTP requests.
+**FIXME: This information needs to be more prominant in this README
 
-> Assume the client is instantiated before each example below.
+This library should only be used with the Okta management API. To call the [Authentication API][authn-api], you will need to call the Authentication API directly using a library like (https://3.python-requests.org/)[Requests].
+
+## Calling the Okta API
+
+> All of the examples below assume that the `okta` client is already instantiated using code like this:
 >
 > ```py
 > from okta.client import Client as OktaClient
 > import okta.models as models
-> client = OktaClient({"orgUrl": "https://test.okta.com", "token": "YOUR_API_TOKEN"})
+> client = OktaClient()
 > ```
 
 ### Get and set custom attributes
@@ -184,23 +158,26 @@ user_profile.last_name = "Doe"
 user_profile.email = "John.Doe@okta.com"
 user_profile.login = "John.Doe@okta.com"
 
+**FIXME:** I hate this returning of a tuple, it should be an object
+See also: https://3.python-requests.org/user/quickstart/#response-status-codes
+
 """ Getting attributes from instance """
-user, resp, err = await client.get_user(user.id)
+user, resp, err = await okta.get_user(user.id)
 nick_name = user.profile.nick_name
 ```
 
 ### Get a User
 
 ```py
-user, resp, err = await client.get_user(user.id)
+user, resp, err = await okta.get_user(user.id)
 # OR using their login
-user, resp, err = await client.get_user(user.profile.login)
+user, resp, err = await okta.get_user(user.profile.login)
 ```
 
 ### List all Users
 
 ```py
-users, resp, err = await client.list_users()
+users, resp, err = await okta.list_users()
 ```
 
 ### Filter or search for Users
@@ -208,7 +185,7 @@ users, resp, err = await client.list_users()
 ```py
 # Query parameters are optional on methods that can use them! Check the method definition for details on what query parameters are accepted
 query_parameters = {"filter": "status eq \"ACTIVE\""}
-users, resp, err = await client.list_users(query_parameters)
+users, resp, err = await okta.list_users(query_parameters)
 ```
 
 ### Create a User
@@ -237,7 +214,7 @@ create_user_req = models.CreateUserRequest({
 })
 
 # Create User
-user, resp, err = await client.create_user(create_user_req)
+user, resp, err = await okta.create_user(create_user_req)
 ```
 
 ### Update a User
@@ -250,7 +227,7 @@ new_profile.nick_name = "Oktanaut"
 updated_user_obj = models.User({"profile": new_profile})
 
 # Update User with new details
-updated_user, _, err = await client.update_user(user.id, updated_user_obj)
+updated_user, _, err = await okta.update_user(user.id, updated_user_obj)
 ```
 
 ### Remove a User
@@ -261,15 +238,15 @@ You must first deactivate the user, and then you can delete the user.
 # Assuming user starts off with a status of "ACTIVE"
 
 # Deactivate
-resp, err = await client.deactivate_or_delete_user(user.id)
+resp, err = await okta.deactivate_or_delete_user(user.id)
 # Then delete
-resp, err = await client.deactivate_or_delete_user(user.id)
+resp, err = await okta.deactivate_or_delete_user(user.id)
 ```
 
 ### List a User's Groups
 
 ```py
-users_groups, resp, err = await client.list_user_groups(user.id)
+users_groups, resp, err = await okta.list_user_groups(user.id)
 ```
 
 ### Create a Group
@@ -284,22 +261,27 @@ group_model = models.Group({
 })
 
 # Create Group
-group, resp, err = await client.create_group(group_model)
+group, resp, err = await okta.create_group(group_model)
 ```
 
 ### Add a User to a Group
 
+*FIXME:* This should be `group.add_user(user)` or maybe okta.add_user_to_group(user, group)
+
+*BUG:* the order of parameters should match the method name `add_user_to_group(user.id, group.id)`
 ```py
-resp, err = await client.add_user_to_group(group.id, user.id)
+resp, err = await okta.add_user_to_group(group.id, user.id)
 ```
 
 ### List a User's enrolled Factors
 
 ```py
-supported_factors, resp, err = await client.list_supported_factors(user.id)
+supported_factors, resp, err = await okta.list_supported_factors(user.id)
 ```
 
 ### Enroll a User in a new Factor
+
+*FIXME:* Should be `created_user.enroll_factor(sms_factor)`
 
 ```py
 # Create and enroll factor
@@ -308,7 +290,7 @@ sms_factor = models.SmsUserFactor({
         "phoneNumber": "+12345678901"
     })
 })
-enrolled_factor, _, err = await client.enroll_factor(created_user.id, sms_factor)
+enrolled_factor, _, err = await okta.enroll_factor(created_user.id, sms_factor)
 ```
 
 ### Activate a Factor
@@ -317,7 +299,7 @@ enrolled_factor, _, err = await client.enroll_factor(created_user.id, sms_factor
 activate_factor_request = models.ActivateFactorRequest({
   "passCode": "123456"
 })
-activated_factor, resp, err = await client.activate_factor(user.id, factor.id, activate_factor_request)
+activated_factor, resp, err = await okta.activate_factor(user.id, factor.id, activate_factor_request)
 ```
 
 ### Verify a Factor
@@ -326,19 +308,19 @@ activated_factor, resp, err = await client.activate_factor(user.id, factor.id, a
 verify_factor_request = models.ActivateFactorRequest({
   "passCode": "123456"
 })
-verified_factor, resp, err = await client.activate_factor(user.id, factor.id, verify_factor_request)
+verified_factor, resp, err = await okta.activate_factor(user.id, factor.id, verify_factor_request)
 ```
 
 ### List all Applications
 
 ```py
-apps, resp, err = await client.list_applications()
+apps, resp, err = await okta.list_applications()
 ```
 
 ### Get an Application
 
 ```py
-app, resp, err = await client.get_application(app.id)
+app, resp, err = await okta.get_application(app.id)
 ```
 
 ### Create a SWA Application
@@ -362,7 +344,7 @@ swa_app_model = models.SwaApplication({
     "settings": swa_app_settings,
 })
 
-app, resp, err = await client.create_application(swa_app_model)
+app, resp, err = await okta.create_application(swa_app_model)
 ```
 
 ### Call other API endpoints
@@ -371,7 +353,7 @@ Not every API endpoint is represented by a method in this library. You can call 
 
 ```py
 # Example that doesn't return Object
-request, error = await client.get_request_executor().create_request(
+request, error = await okta.get_request_executor().create_request(
   method="POST",
   url="/api/v1/users/USER_ID_HERE/lifecycle/activate",
   body={},
@@ -379,11 +361,11 @@ request, error = await client.get_request_executor().create_request(
   oauth=False
 )
 
-response, error = await client.get_request_executor().execute(request, None)
+response, error = await okta.get_request_executor().execute(request, None)
 response_body = response.get_body()
 
 # Example that does return Object
-request, error = await client.get_request_executor().create_request(
+request, error = await okta.get_request_executor().create_request(
   method="GET",
   url="/api/v1/users/USER_ID_HERE",
   body={},
@@ -391,9 +373,9 @@ request, error = await client.get_request_executor().create_request(
   oauth=False
 )
 
-response, error = await client.get_request_executor().execute(request, models.User)
+response, error = await okta.get_request_executor().execute(request, models.User)
 
-response_body = client.form_response_body(response.get_body())
+response_body = okta.form_response_body(response.get_body())
 user = response.get_type()(response_body)
 ```
 
@@ -405,7 +387,7 @@ Example of listing users 1 at a time:
 
 ```py
 query_parameters = {"limit": "1"}
-users, resp, err = await client.list_users(query_parameters)
+users, resp, err = await okta.list_users(query_parameters)
 
 # Check if there more pages follow
 if resp.has_next:
@@ -486,26 +468,32 @@ okta:
 
 ### Environment variables
 
-Each one of the configuration values above can be turned into an environment variable name with the `_` (underscore) character and UPPERCASE characters. The following are accepted:
+Each one of the YAML configuration values above can be turned into an environment variable name as follows:
+- Replace `camelCase` with `snake_case`.
+- Use underscores (`_`) to seperate words.
+- Use UPPERCASE for all letters.
 
-- `OKTA_CLIENT_TOKEN`
+For example: okta.client.orgUrl becomes `okta_client_org_url`
+
+The Okta SDK supports the following environment variables:
+
 - `OKTA_CLIENT_AUTHORIZATION_MODE`
-- `OKTA_CLIENT_ORG_URL`
-- `OKTA_CLIENT_TOKEN`
-- `OKTA_CLIENT_CLIENT_ID`
-- `OKTA_CLIENT_SCOPES`
-- `OKTA_CLIENT_PRIVATE_KEY`
-- `OKTA_CLIENT_USER_AGENT`
-- `OKTA_CLIENT_CONNECTIONTIMEOUT`
-- `OKTA_CLIENT_REQUESTTIMEOUT`
-- `OKTA_CLIENT_CACHE_ENABLED`
 - `OKTA_CLIENT_CACHE_DEFAULT_TTI`
 - `OKTA_CLIENT_CACHE_DEFAULT_TTL`
-- `OKTA_CLIENT_PROXY_PORT`
+- `OKTA_CLIENT_CACHE_ENABLED`
+- `OKTA_CLIENT_CLIENT_ID`
+- `OKTA_CLIENT_CONNECTIONTIMEOUT`
+- `OKTA_CLIENT_ORG_URL`
+- `OKTA_CLIENT_PRIVATE_KEY`
 - `OKTA_CLIENT_PROXY_HOST`
-- `OKTA_CLIENT_PROXY_USERNAME`
 - `OKTA_CLIENT_PROXY_PASSWORD`
+- `OKTA_CLIENT_PROXY_PORT`
+- `OKTA_CLIENT_PROXY_USERNAME`
 - `OKTA_CLIENT_RATE_LIMIT_MAX_RETRIES`
+- `OKTA_CLIENT_REQUESTTIMEOUT`
+- `OKTA_CLIENT_SCOPES`
+- `OKTA_CLIENT_TOKEN`
+- `OKTA_CLIENT_USER_AGENT`
 - `OKTA_TESTING_TESTING_DISABLE_HTTPS_CHECK`
 
 ## Rate Limiting
@@ -520,8 +508,8 @@ You can configure the following options when using the built-in retry strategy:
 
 | Configuration Option        | Description                                                                                                                                          |
 | --------------------------- | ---------------------------------------------------------------------------------------------------------------------------------------------------- |
-| client.requestTimeout       | The waiting time in seconds for a request to be resolved by the client. Less than or equal to 0 means "no timeout". The default value is `0` (None). |
-| client.rateLimit.maxRetries | The number of times to retry.                                                                                                                        |
+| `okta.requestTimeout`       | The waiting time in seconds for a request to be resolved by the okta. Less than or equal to 0 means "no timeout". The default value is `0` (None). |
+| `okta.rateLimit.maxRetries` | The number of times to retry.                                                                                                                        |
 
 Check out the [Configuration Reference section](#configuration-reference) for more details about how to set these values via configuration.
 
@@ -554,3 +542,47 @@ We're happy to accept contributions and PRs! Please see the [Contribution Guide]
 [dev-okta-signup]: https://developer.okta.com/signup
 [api-token-docs]: https://developer.okta.com/docs/api/getting_started/getting_a_token
 [python-docs]: https://docs.python.org/3/library/asyncio.html
+
+## Advanced Useage
+
+### Extending the Client
+
+When creating a new client, we allow for you to pass custom instances of `okta.request_executor`, `okta.http_client` and `okta.cache.cache`.
+
+```py
+from okta.client import Client as OktaClient
+# Assuming implementations are in project.custom
+from project.custom.request_executor_impl import RequestExecImpl
+from project.custom.http_client_impl import HTTPClientImpl
+from project.custom.cache_impl import CacheImpl
+okta = okta.OktaClient({
+    "orgUrl": "https://test.okta.com",
+    "token": "YOUR_API_TOKEN",
+    "requestExecutor": RequestExecImpl,
+    "httpClient": HTTPClientImpl,
+    "cacheManager": CacheImpl
+})
+```
+
+### Extending or Creating New Classes
+
+Example: You can create a custom cache driver by implementing `okta.cache.cache`
+
+```py
+from okta.cache.cache import Cache
+
+class CustomCache(Cache):
+  def __init__(self, params):
+    super().__init__()
+    # Constructor
+
+  # Must implement all methods from the Cache class
+  def get(self, key):
+    # Implementation
+
+  """Rest of methods"""
+  ...
+```
+
+A similar approach can be used to extend `okta.request_executor` and `okta.http_client`.
+
